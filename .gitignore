@@ -1,0 +1,20 @@
+# Segredos
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Documentos de trabalho e resultados de avaliação (podem ser grandes)
+documentos/
+evals/resultados/
+
+# Editores e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

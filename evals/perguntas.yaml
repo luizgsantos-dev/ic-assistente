@@ -1,0 +1,33 @@
+# Perguntas de teste. `ic avaliar` roda todas e mede acertos e invenções.
+#
+# Campos:
+#   id            identificador curto e único
+#   pergunta      como uma pessoa real perguntaria (sem acento, com erro de digitação, tanto faz)
+#   esperado      o que a resposta certa precisa dizer, tirado dos documentos
+#   deve_recusar  true quando a resposta NÃO está nos documentos (o certo é dizer que não sabe)
+#   hoje          opcional: data simulada, para perguntas que dependem do dia ("já passou?")
+#
+# Itens com "PREENCHER" são pulados até alguém escrever a resposta esperada.
+# Meta: 30 a 50 perguntas, com umas 10 de deve_recusar.
+
+- id: fim-do-semestre
+  pergunta: quando acaba o semestre?
+  hoje: 2026-10-23
+  esperado: PREENCHER com a data de término do semestre letivo vigente, pelo calendário acadêmico
+
+- id: materia-de-verao
+  pergunta: qual vai ser a materia de verao?
+  esperado: PREENCHER
+
+- id: semana-academica
+  pergunta: O que é a semana acadêmica?
+  esperado: PREENCHER
+
+# Perguntas sem resposta nos documentos: o assistente não pode inventar.
+- id: recusa-fora-do-tema
+  pergunta: Quem ganhou a Copa do Mundo de 2022?
+  deve_recusar: true
+
+- id: recusa-telefone-inexistente
+  pergunta: Qual o telefone da cantina do IC?
+  deve_recusar: true

@@ -1,0 +1,21 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ic}
+      POSTGRES_DB: ic_assistant
+    # Só na máquina local; a porta 5433 evita conflito com um Postgres já instalado.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ic -d ic_assistant"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
