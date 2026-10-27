@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Computed, DateTime, ForeignKey, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 EMBEDDING_DIM = 1024
@@ -79,3 +79,105 @@ class Trecho(Base):
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
+
+
+VINCULOS = {
+    "aluno": "Aluno",
+    "docente": "Docente",
+    "tecnico": "Técnico administrativo",
+    "outro": "Outro",
+}
+
+
+class Usuario(Base):
+    __tablename__ = "usuarios"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(Text)
+    # Sempre em minúsculas; a comparação no login também é feita em minúsculas.
+    email: Mapped[str] = mapped_column(Text, unique=True)
+    senha_hash: Mapped[str] = mapped_column(Text)
+    vinculo: Mapped[str] = mapped_column(String(20))
+    curso: Mapped[str | None] = mapped_column(Text)
+    # "usuario" ou "admin" (secretaria). Admin não tem limite diário e acessa o painel.
+    papel: Mapped[str] = mapped_column(String(20), default="usuario")
+    ativo: Mapped[bool] = mapped_column(default=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    ultimo_acesso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Sessao(Base):
+    __tablename__ = "sessoes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), index=True
+    )
+    # Guarda só o hash do token do cookie; quem tiver acesso ao banco não consegue se logar.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    usuario: Mapped[Usuario] = relationship()
+
+
+class TokenSenha(Base):
+    """Link de "esqueci minha senha": vale uma vez, por pouco tempo."""
+
+    __tablename__ = "tokens_senha"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    usado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Conversa(Base):
+    __tablename__ = "conversas"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), index=True
+    )
+    titulo: Mapped[str] = mapped_column(Text)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    mensagens: Mapped[list["Mensagem"]] = relationship(
+        back_populates="conversa",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="Mensagem.id",
+    )
+
+
+class Mensagem(Base):
+    __tablename__ = "mensagens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversa_id: Mapped[int] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE"), index=True
+    )
+    # Repetido aqui para contar o limite diário sem juntar com conversas.
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"))
+    papel: Mapped[str] = mapped_column(String(20))  # "usuario" ou "assistente"
+    conteudo: Mapped[str] = mapped_column(Text)
+    # Pergunta reescrita para ser entendida sem o histórico (é ela que vai para a busca).
+    pergunta_busca: Mapped[str | None] = mapped_column(Text)
+    fundamentada: Mapped[bool | None]
+    # ok, sem_trechos, sem_citacoes, recusa, max_tokens ou erro
+    motivo: Mapped[str | None] = mapped_column(String(20))
+    citacoes: Mapped[list | None] = mapped_column(JSONB)
+    trechos: Mapped[list | None] = mapped_column(JSONB)
+    modelo: Mapped[str | None] = mapped_column(Text)
+    uso: Mapped[dict | None] = mapped_column(JSONB)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    conversa: Mapped[Conversa] = relationship(back_populates="mensagens")
+
+    __table_args__ = (Index("ix_mensagens_usuario_data", "usuario_id", "criada_em"),)

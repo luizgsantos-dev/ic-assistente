@@ -1,6 +1,7 @@
 """Geração da resposta com Claude, presa aos trechos recuperados por meio de citações."""
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -41,6 +42,10 @@ recente. Se a diferença importar para a pessoa, avise que existe uma versão an
 informação.
 - A data de hoje vem junto com a pergunta. Use-a para interpretar "este semestre", "o próximo \
 prazo", "já passou?" e afins, comparando com as datas que aparecem nos documentos.
+- As mensagens anteriores da conversa servem para entender a pergunta atual ("e para SI?"). Os \
+fatos da resposta vêm dos trechos enviados junto com a pergunta atual.
+- A pergunta pode trazer quem está perguntando (vínculo e curso). Use isso para escolher a \
+informação certa, como as regras do curso da pessoa, sem supor mais nada sobre ela.
 - Escreva em português do Brasil, de forma direta e cordial. Comece pela resposta e depois dê \
 os detalhes que ajudarem. Para processos, use passos numerados.
 - Não mencione nomes de arquivos, números de página nem "os trechos" na resposta, a menos que a \
@@ -89,7 +94,15 @@ def _titulo_resultado(t: TrechoRecuperado) -> str:
     return " | ".join(partes)
 
 
-def montar_mensagens(pergunta: str, trechos: list[TrechoRecuperado], hoje: date) -> list[dict]:
+def montar_mensagens(
+    pergunta: str,
+    trechos: list[TrechoRecuperado],
+    hoje: date,
+    historico: list[dict] | None = None,
+    perfil: str | None = None,
+) -> list[dict]:
+    """`historico` são as mensagens anteriores só com texto ({"role", "content"}); os trechos
+    vão apenas na pergunta atual, para não pagar de novo por eles a cada mensagem."""
     resultados = [
         {
             "type": "search_result",
@@ -106,11 +119,12 @@ def montar_mensagens(pergunta: str, trechos: list[TrechoRecuperado], hoje: date)
         }
         for t in trechos
     ]
-    pedido = (
-        f"Data de hoje: {hoje.strftime('%d/%m/%Y')} ({DIAS_SEMANA[hoje.weekday()]}).\n\n"
-        f"Pergunta: {pergunta}"
-    )
-    return [{"role": "user", "content": [*resultados, {"type": "text", "text": pedido}]}]
+    pedido = f"Data de hoje: {hoje.strftime('%d/%m/%Y')} ({DIAS_SEMANA[hoje.weekday()]}).\n"
+    if perfil:
+        pedido += f"Quem pergunta: {perfil}.\n"
+    pedido += f"\nPergunta: {pergunta}"
+    atual = {"role": "user", "content": [*resultados, {"type": "text", "text": pedido}]}
+    return [*(historico or []), atual]
 
 
 def mensagem_sem_resposta(settings: Settings) -> str:
@@ -120,32 +134,74 @@ def mensagem_sem_resposta(settings: Settings) -> str:
     )
 
 
-def responder(
+def _parametros(
     pergunta: str,
     trechos: list[TrechoRecuperado],
-    cliente,
     settings: Settings,
-    hoje: date | None = None,
-) -> Resposta:
-    if not trechos:
-        # Nada relevante nos documentos: não vale gastar uma chamada (nem arriscar invenção).
-        return Resposta(mensagem_sem_resposta(settings), fundamentada=False, motivo="sem_trechos")
-
-    resp = cliente.beta.messages.create(
-        model=settings.llm_model,
-        max_tokens=settings.llm_max_tokens,
-        system=[
+    hoje: date | None,
+    historico: list[dict] | None,
+    perfil: str | None,
+) -> dict:
+    return {
+        "model": settings.llm_model,
+        "max_tokens": settings.llm_max_tokens,
+        "system": [
             {
                 "type": "text",
                 "text": prompt_sistema(settings),
                 "cache_control": {"type": "ephemeral"},
             }
         ],
-        messages=montar_mensagens(pergunta, trechos, hoje or hoje_local(settings)),
-        output_config={"effort": settings.llm_effort},
+        "messages": montar_mensagens(
+            pergunta, trechos, hoje or hoje_local(settings), historico, perfil
+        ),
+        "output_config": {"effort": settings.llm_effort},
         **opcoes_fallback(settings.llm_model),
+    }
+
+
+def responder(
+    pergunta: str,
+    trechos: list[TrechoRecuperado],
+    cliente,
+    settings: Settings,
+    hoje: date | None = None,
+    historico: list[dict] | None = None,
+    perfil: str | None = None,
+) -> Resposta:
+    if not trechos:
+        # Nada relevante nos documentos: não vale gastar uma chamada (nem arriscar invenção).
+        return Resposta(mensagem_sem_resposta(settings), fundamentada=False, motivo="sem_trechos")
+
+    resp = cliente.beta.messages.create(
+        **_parametros(pergunta, trechos, settings, hoje, historico, perfil)
     )
     return interpretar(resp, trechos, settings)
+
+
+def responder_em_partes(
+    pergunta: str,
+    trechos: list[TrechoRecuperado],
+    cliente,
+    settings: Settings,
+    hoje: date | None = None,
+    historico: list[dict] | None = None,
+    perfil: str | None = None,
+) -> Iterator[str | Resposta]:
+    """Versão em streaming de `responder`: gera os pedaços de texto conforme chegam e, por
+    último, a `Resposta` completa (que pode trocar o texto, por exemplo numa recusa)."""
+    if not trechos:
+        texto = mensagem_sem_resposta(settings)
+        yield texto
+        yield Resposta(texto, fundamentada=False, motivo="sem_trechos")
+        return
+
+    with cliente.beta.messages.stream(
+        **_parametros(pergunta, trechos, settings, hoje, historico, perfil)
+    ) as stream:
+        yield from stream.text_stream
+        final = stream.get_final_message()
+    yield interpretar(final, trechos, settings)
 
 
 def interpretar(resp, trechos: list[TrechoRecuperado], settings: Settings) -> Resposta:

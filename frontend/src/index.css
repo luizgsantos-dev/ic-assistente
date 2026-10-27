@@ -1,0 +1,67 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Cores como variáveis, trocadas no modo escuro. */
+:root {
+  --fundo: #f6f7f9;
+  --superficie: #ffffff;
+  --superficie-2: #eef1f5;
+  --texto: #1b2230;
+  --texto-suave: #5b6576;
+  --borda: #dde2ea;
+  --primaria: #1f3a68;
+  --primaria-hover: #2a4b84;
+  --primaria-texto: #ffffff;
+  --destaque: #e7eef9;
+  --perigo: #b42318;
+  --perigo-fundo: #fdecea;
+  --foco: #3b6fd1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #0f141c;
+    --superficie: #161c26;
+    --superficie-2: #1d2532;
+    --texto: #e6e9ef;
+    --texto-suave: #9aa4b5;
+    --borda: #2a3342;
+    --primaria: #6d9be8;
+    --primaria-hover: #86acee;
+    --primaria-texto: #0d1420;
+    --destaque: #1e2a3d;
+    --perigo: #f2867c;
+    --perigo-fundo: #3a1d1b;
+    --foco: #86acee;
+  }
+}
+
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-borda: var(--borda);
+  --color-primaria: var(--primaria);
+  --color-primaria-hover: var(--primaria-hover);
+  --color-primaria-texto: var(--primaria-texto);
+  --color-destaque: var(--destaque);
+  --color-perigo: var(--perigo);
+  --color-perigo-fundo: var(--perigo-fundo);
+  --color-foco: var(--foco);
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

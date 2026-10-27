@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -15,14 +16,18 @@ class EmbedderLocal:
         self._nome = modelo
         self._dim = dim
         self._modelo = None
+        # No servidor várias requisições podem chegar antes de o modelo terminar de carregar.
+        self._trava = threading.Lock()
 
     def _carregar(self):
-        if self._modelo is None:
-            from sentence_transformers import SentenceTransformer
+        with self._trava:
+            if self._modelo is None:
+                from sentence_transformers import SentenceTransformer
 
-            self._modelo = SentenceTransformer(self._nome, device="cpu")
-            # Os trechos têm ~1500 caracteres; limitar o tamanho evita estourar memória.
-            self._modelo.max_seq_length = 1024
+                modelo = SentenceTransformer(self._nome, device="cpu")
+                # Os trechos têm ~1500 caracteres; limitar o tamanho evita estourar memória.
+                modelo.max_seq_length = 1024
+                self._modelo = modelo
         return self._modelo
 
     def embed_documentos(self, textos: Sequence[str]) -> list[list[float]]:

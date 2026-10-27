@@ -9,6 +9,10 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
+# Frontend
+node_modules/
+dist/
+
 # Documentos de trabalho e resultados de avaliação (podem ser grandes)
 documentos/
 evals/resultados/

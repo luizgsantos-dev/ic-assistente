@@ -63,6 +63,37 @@ def migrar() -> None:
 
 
 @app.command()
+def servidor(
+    host: Annotated[str, typer.Option(help="Use 0.0.0.0 para aceitar conexões de fora.")] = (
+        "127.0.0.1"
+    ),
+    porta: Annotated[int, typer.Option()] = 8000,
+    recarregar: Annotated[bool, typer.Option(help="Reinicia ao salvar o código.")] = False,
+) -> None:
+    """Sobe a API web."""
+    import uvicorn
+
+    uvicorn.run("app.api.app:criar_app", factory=True, host=host, port=porta, reload=recarregar)
+
+
+@app.command()
+def admin(
+    email: str,
+    remover: Annotated[bool, typer.Option(help="Tira o acesso de admin.")] = False,
+) -> None:
+    """Dá (ou tira) acesso de secretaria a um usuário já cadastrado."""
+    from .models import Usuario
+
+    with sessao() as s:
+        usuario = s.scalar(select(Usuario).where(Usuario.email == email.lower()))
+        if usuario is None:
+            raise typer.BadParameter(f"nenhum usuário com o e-mail {email}")
+        usuario.papel = "usuario" if remover else "admin"
+        s.commit()
+    console.print(f"[green]{email} agora é {usuario.papel}.[/]")
+
+
+@app.command()
 def ingerir(
     caminhos: Annotated[list[Path], typer.Argument(exists=True, help="Arquivos ou pastas.")],
     categoria: Annotated[

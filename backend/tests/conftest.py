@@ -76,5 +76,6 @@ def engine_teste():
 def sessao_db(engine_teste):
     with Session(engine_teste, expire_on_commit=False) as s:
         yield s
+    tabelas = "trechos, documentos, mensagens, conversas, tokens_senha, sessoes, usuarios"
     with engine_teste.begin() as c:
-        c.execute(text("TRUNCATE trechos, documentos RESTART IDENTITY CASCADE"))
+        c.execute(text(f"TRUNCATE {tabelas} RESTART IDENTITY CASCADE"))

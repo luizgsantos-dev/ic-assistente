@@ -10,9 +10,9 @@ isso e encaminha para o contato certo, em vez de inventar.
 | Fase | O que entrega | Estado |
 |---|---|---|
 | 1. Núcleo | Ingestão de documentos, busca, respostas com citação, avaliação automática (linha de comando) | **pronta para testar com documentos reais** |
-| 2. Chat | API, login, histórico por usuário, conversa com contexto, respostas em streaming, interface web | a fazer |
+| 2. Chat | API, login, histórico por usuário, conversa com contexto, respostas em streaming, limite diário, interface web | **pronta** (falta testar com a chave da API e documentos reais) |
 | 3. Painel da secretaria | Upload de documentos, data/categoria, "substitui", perguntas sem resposta | a fazer |
-| 4. Deploy | Servidor da UFMT com Docker, limite diário por usuário, logs | a fazer |
+| 4. Deploy | Servidor da UFMT com Docker, HTTPS, logs | a fazer |
 | 5. Geração de documentos | Requerimentos preenchidos a partir dos modelos da secretaria | a fazer |
 
 ## Como funciona
@@ -25,6 +25,7 @@ arquivo (PDF, DOCX, MD, TXT)
   → PostgreSQL + pgvector
 
 pergunta
+  → se for continuação ("e para SI?"), é reescrita com o histórico para a busca entender sozinha
   → busca híbrida: vetorial (significado) + textual (palavras exatas), fundidas por RRF
   → só documentos ativos (o substituído sai da busca)
   → Claude com os trechos como "search results" e citações ligadas
@@ -72,11 +73,42 @@ uv run ic perguntar "quando acaba o semestre?"   # resposta completa
 uv run ic perguntar "quando acaba o semestre?" --fontes --hoje 01/12/2026
 ```
 
+## Site (API + interface)
+
+Em desenvolvimento são dois processos: a API (porta 8000) e o Vite (porta 5173), que repassa
+`/api` para a API.
+
+```bash
+cd backend && uv run ic servidor --recarregar
+```
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Abra http://localhost:5173 e crie uma conta. Para dar acesso de secretaria a alguém (painel da
+Fase 3, sem limite diário): `uv run ic admin email@ufmt.br`.
+
+O que a interface faz:
+
+- Cadastro com vínculo (aluno, docente, técnico, outro) e curso; login com sessão em cookie
+  `HttpOnly`; "esqueci minha senha" por e-mail (link vale 1 hora e derruba as sessões abertas).
+- Chat com a resposta aparecendo enquanto é gerada, Markdown, botão de fontes e histórico de
+  conversas por usuário (renomear e apagar pela API).
+- Limite diário de perguntas por pessoa (`LIMITE_DIARIO_PERGUNTAS`, renova à meia-noite de Cuiabá).
+- Modo claro e escuro, seguindo o sistema; layout de celular com menu lateral recolhível.
+
+Segurança: senhas com Argon2; no banco fica só o hash do token de sessão; login trava por 15
+minutos após 5 senhas erradas; a API só aceita JSON em POST/PATCH e não libera CORS (proteção
+contra CSRF); uma pessoa não enxerga conversa de outra (404).
+
 ## Comandos
 
 | Comando | Para quê |
 |---|---|
 | `ic migrar` | Cria ou atualiza as tabelas |
+| `ic servidor [--host] [--porta] [--recarregar]` | Sobe a API web |
+| `ic admin EMAIL [--remover]` | Dá ou tira acesso de secretaria |
 | `ic ingerir CAMINHO... [--categoria] [--data dd/mm/aaaa] [--titulo] [--forcar]` | Adiciona documentos. O mesmo arquivo não entra duas vezes |
 | `ic documentos` | Lista documentos, status e quantos trechos cada um tem |
 | `ic substituir ANTIGO NOVO` | O documento NOVO passa a valer no lugar do ANTIGO |
@@ -114,4 +146,6 @@ perguntas, sendo umas 10 sem resposta.
 cd backend
 uv run pytest            # os testes de banco precisam do `docker compose up -d db`
 uv run ruff check .
+cd ../frontend
+npm run build            # checa os tipos e gera o build
 ```

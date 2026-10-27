@@ -40,6 +40,29 @@ class Settings(BaseSettings):
     contato_fallback: str = "cacomp@ic.ufmt.br"
     fuso_horario: str = "America/Cuiaba"
 
+    # Chat
+    limite_diario_perguntas: int = 30
+    # Quantas mensagens anteriores da conversa entram como contexto.
+    historico_mensagens: int = 6
+    reescrita_model: str = "claude-opus-5-5"
+    # Sugestões no campo "curso" do cadastro, em JSON: CURSOS='["Curso A", "Curso B"]'
+    cursos: list[str] = []
+
+    # Sessão e e-mail
+    sessao_dias: int = 30
+    # Em produção (HTTPS) precisa ser true, senão o navegador manda o cookie sem criptografia.
+    cookie_seguro: bool = False
+    # Endereço do site, usado nos links enviados por e-mail.
+    url_publica: str = "http://localhost:5173"
+    # Sem SMTP_HOST os e-mails só aparecem no log do servidor.
+    smtp_host: str | None = None
+    smtp_porta: int = 587
+    smtp_usuario: str | None = None
+    smtp_senha: str | None = None
+    smtp_remetente: str = "IC-Assistant <nao-responda@ic.ufmt.br>"
+    # starttls (porta 587), ssl (porta 465) ou nenhum
+    smtp_seguranca: str = "starttls"
+
 
 @lru_cache
 def get_settings() -> Settings:
