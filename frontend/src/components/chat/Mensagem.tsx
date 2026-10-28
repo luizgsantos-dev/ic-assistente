@@ -1,5 +1,5 @@
-import { AlertCircle, ChevronDown, FileText } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, ChevronDown, FileText, ThumbsDown, ThumbsUp } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -8,13 +8,23 @@ import { cn } from "@/lib/utils";
 
 export type MensagemTela = {
   chave: string;
+  /** id no servidor; só existe depois que a resposta foi salva */
+  id?: number;
   papel: "usuario" | "assistente";
   conteudo: string;
   citacoes?: Citacao[];
+  avaliacao?: number | null;
   estado: "pronta" | "escrevendo" | "erro";
 };
 
-export function Mensagem({ mensagem }: { mensagem: MensagemTela }) {
+type Props = {
+  mensagem: MensagemTela;
+  aoAvaliar?: (mensagem: MensagemTela, valor: 1 | -1 | 0) => void;
+};
+
+export function Mensagem({ mensagem, aoAvaliar }: Props) {
+  const [fontesAbertas, setFontesAbertas] = useState(false);
+
   if (mensagem.papel === "usuario") {
     return (
       <div className="flex justify-end">
@@ -48,6 +58,9 @@ export function Mensagem({ mensagem }: { mensagem: MensagemTela }) {
     );
   }
 
+  const grupos = agruparFontes(mensagem.citacoes ?? []);
+  const pronta = mensagem.estado === "pronta";
+
   return (
     <div className="max-w-full">
       <div
@@ -60,39 +73,45 @@ export function Mensagem({ mensagem }: { mensagem: MensagemTela }) {
       >
         <Markdown remarkPlugins={[remarkGfm]}>{mensagem.conteudo}</Markdown>
       </div>
-      {mensagem.estado === "pronta" && mensagem.citacoes && mensagem.citacoes.length > 0 && (
-        <Fontes citacoes={mensagem.citacoes} />
+
+      {pronta && (grupos.length > 0 || (mensagem.id && aoAvaliar)) && (
+        <div className="mt-2 flex items-center gap-1">
+          {grupos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setFontesAbertas((a) => !a)}
+              aria-expanded={fontesAbertas}
+              className={botaoDiscreto}
+            >
+              <FileText className="size-3.5" aria-hidden />
+              Fontes ({grupos.length})
+              <ChevronDown className={cn("size-3.5 transition-transform", fontesAbertas && "rotate-180")} aria-hidden />
+            </button>
+          )}
+          {mensagem.id && aoAvaliar && (
+            <div className="flex items-center" role="group" aria-label="Avaliar a resposta">
+              <BotaoAvaliacao
+                ativo={mensagem.avaliacao === 1}
+                rotulo="Resposta útil"
+                aoClicar={() => aoAvaliar(mensagem, mensagem.avaliacao === 1 ? 0 : 1)}
+              >
+                <ThumbsUp className="size-3.5" />
+              </BotaoAvaliacao>
+              <BotaoAvaliacao
+                ativo={mensagem.avaliacao === -1}
+                rotulo="Resposta errada ou incompleta"
+                aoClicar={() => aoAvaliar(mensagem, mensagem.avaliacao === -1 ? 0 : -1)}
+              >
+                <ThumbsDown className="size-3.5" />
+              </BotaoAvaliacao>
+            </div>
+          )}
+        </div>
       )}
-    </div>
-  );
-}
 
-function Fontes({ citacoes }: { citacoes: Citacao[] }) {
-  const [aberto, setAberto] = useState(false);
-  // Uma linha por documento + páginas, com os trechos citados dele.
-  const grupos = new Map<string, { titulo: string; paginas: string | null; trechos: string[] }>();
-  for (const c of citacoes) {
-    const chave = `${c.documento_id}|${c.paginas ?? ""}`;
-    const grupo = grupos.get(chave) ?? { titulo: c.titulo, paginas: c.paginas, trechos: [] };
-    grupo.trechos.push(c.texto_citado);
-    grupos.set(chave, grupo);
-  }
-
-  return (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={() => setAberto((a) => !a)}
-        aria-expanded={aberto}
-        className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-texto-suave hover:bg-superficie-2 hover:text-texto"
-      >
-        <FileText className="size-3.5" aria-hidden />
-        Fontes ({grupos.size})
-        <ChevronDown className={cn("size-3.5 transition-transform", aberto && "rotate-180")} aria-hidden />
-      </button>
-      {aberto && (
+      {pronta && fontesAbertas && (
         <ul className="mt-1.5 space-y-2 border-l-2 border-borda pl-3">
-          {[...grupos.values()].map((g) => (
+          {grupos.map((g) => (
             <li key={`${g.titulo}${g.paginas}`} className="text-xs">
               <p className="font-medium text-texto">
                 {g.titulo}
@@ -107,4 +126,45 @@ function Fontes({ citacoes }: { citacoes: Citacao[] }) {
       )}
     </div>
   );
+}
+
+const botaoDiscreto =
+  "inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium " +
+  "text-texto-suave hover:bg-superficie-2 hover:text-texto";
+
+function BotaoAvaliacao({
+  ativo,
+  rotulo,
+  aoClicar,
+  children,
+}: {
+  ativo: boolean;
+  rotulo: string;
+  aoClicar: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={aoClicar}
+      aria-pressed={ativo}
+      aria-label={rotulo}
+      title={rotulo}
+      className={cn(botaoDiscreto, "px-2", ativo && "bg-destaque text-texto")}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Uma entrada por documento + páginas, com os trechos citados dele. */
+function agruparFontes(citacoes: Citacao[]) {
+  const grupos = new Map<string, { titulo: string; paginas: string | null; trechos: string[] }>();
+  for (const c of citacoes) {
+    const chave = `${c.documento_id}|${c.paginas ?? ""}`;
+    const grupo = grupos.get(chave) ?? { titulo: c.titulo, paginas: c.paginas, trechos: [] };
+    grupo.trechos.push(c.texto_citado);
+    grupos.set(chave, grupo);
+  }
+  return [...grupos.values()];
 }

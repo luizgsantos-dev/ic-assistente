@@ -28,9 +28,11 @@ const SUGESTOES = [
 function paraTela(m: MensagemApi): MensagemTela {
   return {
     chave: String(m.id),
+    id: m.id,
     papel: m.papel,
     conteudo: m.conteudo,
     citacoes: m.citacoes ?? undefined,
+    avaliacao: m.avaliacao,
     estado: m.motivo === "erro" ? "erro" : "pronta",
   };
 }
@@ -119,7 +121,14 @@ export function Chat() {
               atualizar((m) => ({ ...m, conteudo: m.conteudo + evento.t }));
               break;
             case "fim":
-              atualizar((m) => ({ ...m, conteudo: evento.texto, citacoes: evento.citacoes, estado: "pronta" }));
+              atualizar((m) => ({
+                ...m,
+                id: evento.mensagem_id,
+                conteudo: evento.texto,
+                citacoes: evento.citacoes,
+                avaliacao: null,
+                estado: "pronta",
+              }));
               atualizarRestantes(evento.perguntas_restantes);
               break;
             case "erro":
@@ -144,6 +153,18 @@ export function Chat() {
         setEnviando(false);
       }
       recarregarConversas();
+    }
+  }
+
+  async function avaliar(mensagem: MensagemTela, valor: 1 | -1 | 0) {
+    const definir = (avaliacao: number | null | undefined) =>
+      setMensagens((ms) => ms.map((m) => (m.chave === mensagem.chave ? { ...m, avaliacao } : m)));
+    // Atualiza na hora e volta atrás se o servidor recusar.
+    definir(valor || null);
+    try {
+      await api(`/mensagens/${mensagem.id}/avaliacao`, { metodo: "POST", corpo: { valor } });
+    } catch {
+      definir(mensagem.avaliacao);
     }
   }
 
@@ -194,7 +215,7 @@ export function Chat() {
             ) : (
               <div className="space-y-6">
                 {mensagens.map((m) => (
-                  <Mensagem key={m.chave} mensagem={m} />
+                  <Mensagem key={m.chave} mensagem={m} aoAvaliar={avaliar} />
                 ))}
               </div>
             )}

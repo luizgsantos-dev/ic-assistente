@@ -330,7 +330,10 @@ def test_titulo_da_conversa():
 
 
 def test_sem_historico_nao_reescreve(settings):
-    assert reescrever_pergunta([], "quando acaba?", "Aluno", object(), settings) == "quando acaba?"
+    assert reescrever_pergunta([], "quando acaba?", "Aluno", object(), settings) == (
+        "quando acaba?",
+        None,
+    )
 
 
 def test_dia_comeca_a_meia_noite_de_cuiaba(settings):

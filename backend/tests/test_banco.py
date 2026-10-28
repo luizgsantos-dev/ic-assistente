@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import select
 
 from app.busca import buscar
-from app.ingestao.leitura import Bloco
 from app.ingestao.pipeline import ErroIngestao, ingerir_arquivo, substituir
 from app.models import Documento, Trecho
 from tests.pdfs import criar_pdf, criar_pdf_sem_texto
@@ -145,13 +144,45 @@ def test_pdf_escaneado_sem_api_vira_erro_registrado(sessao_db, tmp_path, embedde
 
 def test_pdf_escaneado_usa_o_transcritor(sessao_db, tmp_path, embedder, settings):
     caminho = criar_pdf_sem_texto(tmp_path / "portaria.pdf")
+    chamadas = []
 
     def transcritor(_):
-        return [Bloco("A matrícula de verão vai de 5 a 9 de janeiro.", 1, "Portaria 01/2026")]
+        chamadas.append(1)
+        return (
+            "<!-- página 1 -->\n# Portaria 01/2026\n\nA matrícula de verão vai de 5 a 9 de janeiro."
+        )
 
     r = _ingerir(sessao_db, caminho, embedder, settings, transcritor=transcritor)
     assert r.documento.transcrito_por_ia
     assert any("transcrito" in a for a in r.avisos)
-    assert (
-        buscar(sessao_db, "matrícula de verão", embedder, settings)[0].secao == "Portaria 01/2026"
+    [trecho] = buscar(sessao_db, "matrícula de verão", embedder, settings)
+    assert (trecho.secao, trecho.pagina_inicio) == ("Portaria 01/2026", 1)
+
+    # Reprocessar usa a transcrição guardada: não paga a API de novo.
+    _ingerir(sessao_db, caminho, embedder, settings, transcritor=transcritor, forcar=True)
+    assert chamadas == [1]
+
+
+def test_titulo_e_data_informados_nao_sao_trocados_pelos_metadados(
+    sessao_db, tmp_path, embedder, settings
+):
+    caminho = criar_pdf(
+        tmp_path / "res.pdf",
+        [[("Resolução", 18), ("Texto da resolução sobre aproveitamento de estudos.", 11)]],
+        titulo="Título dos metadados",
+        data_criacao="D:20200101000000",
     )
+    r = _ingerir(
+        sessao_db,
+        caminho,
+        embedder,
+        settings,
+        titulo="Resolução 12/2025",
+        data_documento=date(2025, 6, 1),
+    )
+    assert (r.documento.titulo, r.documento.data_documento) == (
+        "Resolução 12/2025",
+        date(2025, 6, 1),
+    )
+    assert r.documento.data_origem == "informada"
+    assert not any("metadados" in a for a in r.avisos)

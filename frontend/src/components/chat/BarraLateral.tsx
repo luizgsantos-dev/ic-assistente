@@ -1,4 +1,4 @@
-import { LogOut, MessageSquare, Plus, Trash2, X } from "lucide-react";
+import { LayoutDashboard, LogOut, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { Link } from "react-router";
 
 import { Botao } from "@/components/ui";
@@ -57,11 +57,20 @@ export function BarraLateral({
           </Botao>
         </div>
 
-        <div className="px-3">
+        <div className="space-y-1 px-3">
           <Botao variante="secundaria" className="w-full justify-start" onClick={aoNovaConversa}>
             <Plus className="size-4" aria-hidden />
             Nova conversa
           </Botao>
+          {usuario.papel === "admin" && (
+            <Link
+              to="/painel"
+              className="flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium text-texto-suave hover:bg-superficie-2 hover:text-texto"
+            >
+              <LayoutDashboard className="size-4" aria-hidden />
+              Painel da secretaria
+            </Link>
+          )}
         </div>
 
         <nav className="mt-3 flex-1 overflow-y-auto px-3 pb-3">

@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 
 from .config import RAIZ_REPO, Settings, get_settings
 from .db import sessao
+from .models import CATEGORIAS
 
 app = typer.Typer(
     help="IC-Assistant: assistente do Instituto de Computação da UFMT.", no_args_is_help=True
@@ -96,9 +97,7 @@ def admin(
 @app.command()
 def ingerir(
     caminhos: Annotated[list[Path], typer.Argument(exists=True, help="Arquivos ou pastas.")],
-    categoria: Annotated[
-        str, typer.Option(help="calendario, ppc, resolucao, edital, evento, faq, geral...")
-    ] = "geral",
+    categoria: Annotated[str, typer.Option(help=", ".join(CATEGORIAS))] = "geral",
     data: Annotated[str | None, typer.Option(help="Data do documento (dd/mm/aaaa).")] = None,
     titulo: Annotated[str | None, typer.Option(help="Título (só para um arquivo).")] = None,
     forcar: Annotated[bool, typer.Option(help="Reprocessa mesmo se já foi ingerido.")] = False,
@@ -107,6 +106,8 @@ def ingerir(
     from .ingestao.pipeline import ingerir_arquivo, listar_arquivos
     from .ingestao.transcricao import transcrever_pdf
 
+    if categoria not in CATEGORIAS:
+        raise typer.BadParameter(f"categoria desconhecida; use uma destas: {', '.join(CATEGORIAS)}")
     settings = get_settings()
     arquivos = listar_arquivos(caminhos)
     if titulo and len(arquivos) > 1:

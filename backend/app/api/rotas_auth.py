@@ -16,7 +16,7 @@ from ..seguranca import (
     senha_confere,
     usar_token_senha,
 )
-from .deps import COOKIE_SESSAO, Config, Db, UsuarioAtual, exigir_json
+from .deps import COOKIE_SESSAO, Config, Db, UsuarioAtual, protecao_csrf
 from .esquemas import (
     CadastroEntrada,
     EsqueciSenhaEntrada,
@@ -25,7 +25,7 @@ from .esquemas import (
     UsuarioSaida,
 )
 
-router = APIRouter(prefix="/api/auth", tags=["autenticação"], dependencies=[Depends(exigir_json)])
+router = APIRouter(prefix="/api/auth", tags=["autenticação"], dependencies=[Depends(protecao_csrf)])
 
 
 def _saida(db: Session, usuario: Usuario, settings: Settings) -> UsuarioSaida:

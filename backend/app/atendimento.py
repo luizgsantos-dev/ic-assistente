@@ -72,10 +72,13 @@ def carregar_historico(db: Session, conversa_id: int, antes_de: int, limite: int
 
 def reescrever_pergunta(
     historico: list[dict], pergunta: str, perfil: str, cliente, settings: Settings
-) -> str:
-    """Transforma "e para SI?" em uma pergunta que a busca entende sozinha."""
+) -> tuple[str, dict | None]:
+    """Transforma "e para SI?" em uma pergunta que a busca entende sozinha.
+
+    Devolve a pergunta e o uso de tokens da chamada (None se não precisou chamar).
+    """
     if not historico:
-        return pergunta
+        return pergunta, None
     linhas = [
         f"{'Usuário' if m['role'] == 'user' else 'Assistente'}: {m['content']}" for m in historico
     ]
@@ -92,7 +95,12 @@ def reescrever_pergunta(
         output_config={"effort": "low"},
         **opcoes_fallback(settings.reescrita_model),
     )
+    uso = {
+        "modelo": resp.model or settings.reescrita_model,
+        "entrada": resp.usage.input_tokens or 0,
+        "saida": resp.usage.output_tokens or 0,
+    }
     if resp.stop_reason == "refusal":
-        return pergunta
+        return pergunta, uso
     texto = "".join(b.text for b in resp.content if b.type == "text").strip().strip('"')
-    return texto or pergunta
+    return texto or pergunta, uso

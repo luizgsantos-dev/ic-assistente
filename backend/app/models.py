@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Computed, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import Computed, DateTime, ForeignKey, Index, SmallInteger, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -10,6 +10,21 @@ EMBEDDING_DIM = 1024
 # Configuração de busca textual criada na migração: português + remoção de acentos,
 # para "calendario" achar "calendário".
 TS_CONFIG = "pt_unaccent"
+
+
+CATEGORIAS = {
+    "calendario": "Calendário",
+    "ppc": "Cursos e PPC",
+    "processo": "Processos acadêmicos",
+    "docente": "Docentes e técnicos",
+    "institucional": "Institucional",
+    "pesquisa": "Pesquisa e extensão",
+    "evento": "Eventos",
+    "servicos": "Serviços ao estudante",
+    "contatos": "Contatos",
+    "faq": "Perguntas frequentes",
+    "geral": "Geral",
+}
 
 
 class Base(DeclarativeBase):
@@ -25,14 +40,23 @@ class Documento(Base):
     categoria: Mapped[str] = mapped_column(String(50), default="geral")
     # Data de publicação/vigência. É o que decide qual documento vale em caso de conflito.
     data_documento: Mapped[date | None]
+    # "informada" (por quem enviou) ou "metadados" (tirada do arquivo, vale conferir).
+    data_origem: Mapped[str | None] = mapped_column(String(20))
     sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    # Nome da cópia dentro de settings.pasta_arquivos.
+    caminho_arquivo: Mapped[str | None] = mapped_column(Text)
+    tamanho_bytes: Mapped[int | None]
     status: Mapped[str] = mapped_column(String(20), default="pendente")
     erro: Mapped[str | None] = mapped_column(Text)
+    avisos: Mapped[list | None] = mapped_column(JSONB)
     paginas: Mapped[int | None]
     transcrito_por_ia: Mapped[bool] = mapped_column(default=False)
     # Preenchido quando um documento mais novo substitui este; ele sai da busca.
     substituido_por_id: Mapped[int | None] = mapped_column(
         ForeignKey("documentos.id", ondelete="SET NULL")
+    )
+    enviado_por_id: Mapped[int | None] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="SET NULL")
     )
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     atualizado_em: Mapped[datetime] = mapped_column(
@@ -176,6 +200,9 @@ class Mensagem(Base):
     trechos: Mapped[list | None] = mapped_column(JSONB)
     modelo: Mapped[str | None] = mapped_column(Text)
     uso: Mapped[dict | None] = mapped_column(JSONB)
+    # 👍 = 1, 👎 = -1, sem avaliação = None. Só em respostas do assistente.
+    avaliacao: Mapped[int | None] = mapped_column(SmallInteger)
+    avaliada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     conversa: Mapped[Conversa] = relationship(back_populates="mensagens")

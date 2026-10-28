@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     contato_fallback: str = "cacomp@ic.ufmt.br"
     fuso_horario: str = "America/Cuiaba"
 
+    # Cópia de cada documento ingerido (para reprocessar e baixar o original pelo painel).
+    pasta_arquivos: Path = RAIZ_REPO / "armazenamento"
+    tamanho_maximo_mb: int = 30
+
     # Chat
     limite_diario_perguntas: int = 30
     # Quantas mensagens anteriores da conversa entram como contexto.

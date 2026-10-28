@@ -28,12 +28,18 @@ Config = Annotated[Settings, Depends(_settings)]
 Db = Annotated[Session, Depends(_db)]
 
 
-def exigir_json(request: Request) -> None:
-    """Contra CSRF: um formulário de outro site não consegue enviar JSON sem passar pelo CORS,
-    que esta API não libera para ninguém."""
+def protecao_csrf(request: Request) -> None:
+    """Contra CSRF: um formulário de outro site não consegue enviar JSON, nem um cabeçalho
+    próprio, sem passar pelo CORS, que esta API não libera para ninguém. Envio de arquivo
+    (multipart) só é aceito com o cabeçalho X-Requested-With."""
+    if request.method not in METODOS_COM_CORPO:
+        return
     tipo = request.headers.get("content-type", "")
-    if request.method in METODOS_COM_CORPO and not tipo.startswith("application/json"):
-        raise HTTPException(415, "Envie os dados em JSON.")
+    if tipo.startswith("application/json"):
+        return
+    if tipo.startswith("multipart/form-data") and request.headers.get("x-requested-with"):
+        return
+    raise HTTPException(415, "Envie os dados em JSON.")
 
 
 def _usuario_atual(request: Request, db: Db) -> Usuario:

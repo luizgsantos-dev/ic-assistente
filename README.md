@@ -11,7 +11,7 @@ isso e encaminha para o contato certo, em vez de inventar.
 |---|---|---|
 | 1. Núcleo | Ingestão de documentos, busca, respostas com citação, avaliação automática (linha de comando) | **pronta para testar com documentos reais** |
 | 2. Chat | API, login, histórico por usuário, conversa com contexto, respostas em streaming, limite diário, interface web | **pronta** (falta testar com a chave da API e documentos reais) |
-| 3. Painel da secretaria | Upload de documentos, data/categoria, "substitui", perguntas sem resposta | a fazer |
+| 3. Painel da secretaria | Envio de documentos, data/categoria, "substitui", pendências, uso e custo, usuários, avaliação 👍/👎 | **pronta** |
 | 4. Deploy | Servidor da UFMT com Docker, HTTPS, logs | a fazer |
 | 5. Geração de documentos | Requerimentos preenchidos a partir dos modelos da secretaria | a fazer |
 
@@ -86,8 +86,9 @@ cd backend && uv run ic servidor --recarregar
 cd frontend && npm install && npm run dev
 ```
 
-Abra http://localhost:5173 e crie uma conta. Para dar acesso de secretaria a alguém (painel da
-Fase 3, sem limite diário): `uv run ic admin email@ufmt.br`.
+Abra http://localhost:5173 e crie uma conta. Para dar acesso de secretaria a alguém (painel,
+sem limite diário): `uv run ic admin email@ufmt.br`. Depois a própria secretaria dá esse acesso
+a outras pessoas pelo painel.
 
 O que a interface faz:
 
@@ -101,6 +102,24 @@ O que a interface faz:
 Segurança: senhas com Argon2; no banco fica só o hash do token de sessão; login trava por 15
 minutos após 5 senhas erradas; a API só aceita JSON em POST/PATCH e não libera CORS (proteção
 contra CSRF); uma pessoa não enxerga conversa de outra (404).
+
+## Painel da secretaria
+
+Em `/painel` (link na barra lateral, só para quem tem acesso de secretaria):
+
+- **Documentos:** enviar arquivos (arrastar e soltar) com categoria e data; o processamento roda
+  em segundo plano, um por vez, e a lista mostra a situação (na fila, processando, pronto, erro)
+  e os avisos (data tirada dos metadados, PDF transcrito). Dá para editar título, categoria e
+  data, marcar "substituído por", ver os trechos extraídos, baixar o original, processar de novo
+  e apagar. Cada arquivo fica guardado em `armazenamento/` (fora do git); a transcrição de PDF
+  escaneado também, para reprocessar sem pagar a API de novo.
+- **Pendências:** perguntas que o assistente não soube responder e respostas marcadas com 👎.
+  Mostra só a pergunta e a resposta, **nunca quem perguntou**; as conversas das pessoas não
+  aparecem em lugar nenhum do painel.
+- **Uso:** perguntas por dia (respondidas e sem resposta), avaliações, pessoas ativas e custo
+  estimado da API no período (respostas + reescrita das perguntas de continuação).
+- **Usuários:** dar ou tirar acesso de secretaria, desativar ou reativar conta (derruba as
+  sessões na hora) e gerar um link de nova senha para entregar à pessoa (útil sem SMTP).
 
 ## Comandos
 
@@ -139,6 +158,8 @@ perguntas, sendo umas 10 sem resposta.
   trecho vem da própria API e dá para conferir.
 - **Fallback do servidor** (`fallbacks: "default"`): se o modelo recusar uma pergunta por
   política, a API tenta outro modelo na mesma chamada.
+- **Privacidade no painel:** a secretaria vê o que falta nos documentos (pergunta e resposta),
+  não quem perguntou nem as conversas.
 
 ## Testes
 

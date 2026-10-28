@@ -46,9 +46,14 @@ def embedder():
 
 
 @pytest.fixture
-def settings():
+def settings(tmp_path):
     # Com o embedder falso as similaridades são baixas; o limite real é calibrado com o bge-m3.
-    return Settings(_env_file=None, min_similarity=0.15, anthropic_api_key=None)
+    return Settings(
+        _env_file=None,
+        min_similarity=0.15,
+        anthropic_api_key=None,
+        pasta_arquivos=tmp_path / "armazenamento",
+    )
 
 
 @pytest.fixture(scope="session")

@@ -16,6 +16,9 @@
   --perigo: #b42318;
   --perigo-fundo: #fdecea;
   --foco: #3b6fd1;
+  /* Séries de gráfico (validadas para daltonismo e contraste sobre a superfície). */
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,6 +36,8 @@
     --perigo: #f2867c;
     --perigo-fundo: #3a1d1b;
     --foco: #86acee;
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
   }
 }
 
@@ -50,6 +55,8 @@
   --color-perigo: var(--perigo);
   --color-perigo-fundo: var(--perigo-fundo);
   --color-foco: var(--foco);
+  --color-serie-1: var(--serie-1);
+  --color-serie-2: var(--serie-2);
   --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 

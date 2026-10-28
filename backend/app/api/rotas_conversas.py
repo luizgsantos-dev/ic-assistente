@@ -20,12 +20,18 @@ from ..busca import buscar
 from ..models import Conversa, Mensagem, Usuario
 from ..resposta import Resposta, responder_em_partes
 from ..seguranca import agora
-from .deps import Config, Db, UsuarioAtual, cliente_llm, exigir_json
-from .esquemas import ConversaDetalhe, ConversaResumo, PerguntaEntrada, RenomearEntrada
+from .deps import Config, Db, UsuarioAtual, cliente_llm, protecao_csrf
+from .esquemas import (
+    AvaliacaoEntrada,
+    ConversaDetalhe,
+    ConversaResumo,
+    PerguntaEntrada,
+    RenomearEntrada,
+)
 
 log = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["conversas"], dependencies=[Depends(exigir_json)])
+router = APIRouter(prefix="/api", tags=["conversas"], dependencies=[Depends(protecao_csrf)])
 
 MAX_CHARS_TITULO = 60
 
@@ -80,6 +86,20 @@ def renomear_conversa(
 def apagar_conversa(conversa_id: int, usuario: UsuarioAtual, db: Db) -> None:
     db.delete(_conversa_do_usuario(db, conversa_id, usuario))
     db.commit()
+
+
+@router.post("/mensagens/{mensagem_id}/avaliacao")
+def avaliar_resposta(
+    mensagem_id: int, dados: AvaliacaoEntrada, usuario: UsuarioAtual, db: Db
+) -> dict:
+    """👍 (1), 👎 (-1) ou desfazer (0) em uma resposta da própria pessoa."""
+    mensagem = db.get(Mensagem, mensagem_id)
+    if mensagem is None or mensagem.usuario_id != usuario.id or mensagem.papel != "assistente":
+        raise HTTPException(404, "Resposta não encontrada.")
+    mensagem.avaliacao = dados.valor or None
+    mensagem.avaliada_em = agora() if dados.valor else None
+    db.commit()
+    return {"avaliacao": mensagem.avaliacao}
 
 
 @router.post("/chat")
@@ -154,6 +174,7 @@ def _responder(
     )
     resposta: Resposta | None = None
     pergunta_busca = pergunta
+    uso_reescrita: dict | None = None
     try:
         cliente = cliente_llm(estado)
         with estado.fabrica_sessao() as db:
@@ -163,7 +184,9 @@ def _responder(
             if historico:
                 if cliente is None:
                     raise SemChaveApi
-                pergunta_busca = reescrever_pergunta(historico, pergunta, perfil, cliente, settings)
+                pergunta_busca, uso_reescrita = reescrever_pergunta(
+                    historico, pergunta, perfil, cliente, settings
+                )
             trechos = buscar(db, pergunta_busca, estado.embedder, settings)
         if trechos and cliente is None:
             raise SemChaveApi
@@ -189,12 +212,20 @@ def _responder(
             pergunta,
             pergunta_busca,
             Resposta(texto, fundamentada=False, motivo="erro"),
+            uso_reescrita,
         )
         yield _evento("erro", {"mensagem": texto, "perguntas_restantes": restantes})
         return
 
     salva_id = _salvar(
-        estado, conversa_id, usuario_id, mensagem_id, pergunta, pergunta_busca, resposta
+        estado,
+        conversa_id,
+        usuario_id,
+        mensagem_id,
+        pergunta,
+        pergunta_busca,
+        resposta,
+        uso_reescrita,
     )
     yield _evento(
         "fim",
@@ -218,7 +249,11 @@ def _salvar(
     pergunta: str,
     pergunta_busca: str,
     resposta: Resposta,
+    uso_reescrita: dict | None,
 ) -> int:
+    uso = dict(resposta.uso)
+    if uso_reescrita:
+        uso["reescrita"] = uso_reescrita
     with estado.fabrica_sessao() as db:
         if pergunta_busca != pergunta:
             db.get(Mensagem, mensagem_id).pergunta_busca = pergunta_busca
@@ -232,7 +267,7 @@ def _salvar(
             citacoes=[asdict(c) for c in resposta.citacoes],
             trechos=[t.trecho_id for t in resposta.trechos],
             modelo=resposta.modelo,
-            uso=resposta.uso or None,
+            uso=uso or None,
         )
         db.add(salva)
         db.get(Conversa, conversa_id).atualizada_em = agora()

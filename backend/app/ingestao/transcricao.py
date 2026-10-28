@@ -24,7 +24,8 @@ class ErroTranscricao(RuntimeError):
     pass
 
 
-def transcrever_pdf(caminho: Path, cliente, settings: Settings) -> list[Bloco]:
+def transcrever_pdf(caminho: Path, cliente, settings: Settings) -> str:
+    """Devolve a transcrição em Markdown, com uma marca <!-- página N --> por página."""
     dados = caminho.read_bytes()
     if len(dados) > LIMITE_BYTES:
         raise ErroTranscricao(f"{caminho.name} tem mais de 30 MB; divida o PDF antes de enviar")
@@ -52,8 +53,7 @@ def transcrever_pdf(caminho: Path, cliente, settings: Settings) -> list[Bloco]:
         raise ErroTranscricao(f"o modelo recusou transcrever {caminho.name}")
     if msg.stop_reason == "max_tokens":
         raise ErroTranscricao(f"{caminho.name} é longo demais para transcrever de uma vez")
-    texto = "".join(b.text for b in msg.content if b.type == "text")
-    return dividir_paginas_transcritas(texto)
+    return "".join(b.text for b in msg.content if b.type == "text")
 
 
 def dividir_paginas_transcritas(texto: str) -> list[Bloco]:

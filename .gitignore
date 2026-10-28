@@ -13,8 +13,9 @@ __pycache__/
 node_modules/
 dist/
 
-# Documentos de trabalho e resultados de avaliação (podem ser grandes)
+# Documentos de trabalho, cópias guardadas e resultados de avaliação (podem ser grandes)
 documentos/
+armazenamento/
 evals/resultados/
 
 # Editores e sistema
