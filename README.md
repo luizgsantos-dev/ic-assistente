@@ -76,7 +76,8 @@ uv run ic perguntar "quando acaba o semestre?" --fontes --hoje 01/12/2026
 ## Site (API + interface)
 
 Em desenvolvimento são dois processos: a API (porta 8000) e o Vite (porta 5173), que repassa
-`/api` para a API.
+`/api` para a API. Se a 8000 estiver ocupada por outro sistema, suba a API em outra porta e
+aponte o Vite para ela com a variável `IC_API_URL` (ex.: `http://127.0.0.1:8010`).
 
 ```bash
 cd backend && uv run ic servidor --recarregar
@@ -98,6 +99,9 @@ O que a interface faz:
   conversas por usuário (renomear e apagar pela API).
 - Limite diário de perguntas por pessoa (`LIMITE_DIARIO_PERGUNTAS`, renova à meia-noite de Cuiabá).
 - Modo claro e escuro, seguindo o sistema; layout de celular com menu lateral recolhível.
+- Uso por teclado e leitor de tela (meta: WCAG 2.1 AA): foco visível, "Ir para o conteúdo", confirmação
+  com o nome do item, alvos de 44 px e respeito a quem pede menos movimento.
+- O que está sendo digitado (menos senha) sobrevive a recarregar a página e some ao sair da conta.
 
 Segurança: senhas com Argon2; no banco fica só o hash do token de sessão; login trava por 15
 minutos após 5 senhas erradas; a API só aceita JSON em POST/PATCH e não libera CORS (proteção
@@ -105,15 +109,16 @@ contra CSRF); uma pessoa não enxerga conversa de outra (404).
 
 ## Painel da secretaria
 
-Em `/painel` (link na barra lateral, só para quem tem acesso de secretaria):
+Em `/painel` (link na barra lateral, só para quem tem acesso de secretaria). Cada página tem
+endereço próprio, inclusive cada documento (`/painel/documentos/12`):
 
-- **Documentos:** enviar arquivos (arrastar e soltar) com categoria e data; o processamento roda
-  em segundo plano, um por vez, e a lista mostra a situação (na fila, processando, pronto, erro)
-  e os avisos (data tirada dos metadados, PDF transcrito). Dá para editar título, categoria e
-  data, marcar "substituído por", ver os trechos extraídos, baixar o original, processar de novo
-  e apagar. Cada arquivo fica guardado em `armazenamento/` (fora do git); a transcrição de PDF
+- **Documentos:** enviar arquivos (arrastar e soltar, em `/painel/documentos/enviar`) com categoria
+  e data; o processamento roda em segundo plano, um por vez, e a lista mostra a situação (na fila,
+  processando, pronto, com erro). Na página do documento dá para ver os avisos (data tirada dos
+  metadados, PDF transcrito) e os trechos extraídos, editar título, categoria e data, marcar
+  "substituído por", baixar o original, processar de novo e apagar. Cada arquivo fica guardado em `armazenamento/` (fora do git); a transcrição de PDF
   escaneado também, para reprocessar sem pagar a API de novo.
-- **Pendências:** perguntas que o assistente não soube responder e respostas marcadas com 👎.
+- **Pendências:** perguntas que o assistente não soube responder e respostas marcadas como erradas.
   Mostra só a pergunta e a resposta, **nunca quem perguntou**; as conversas das pessoas não
   aparecem em lugar nenhum do painel.
 - **Uso:** perguntas por dia (respondidas e sem resposta), avaliações, pessoas ativas e custo

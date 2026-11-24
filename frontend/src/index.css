@@ -3,19 +3,23 @@
 
 /* Cores como variáveis, trocadas no modo escuro. */
 :root {
+  color-scheme: light;
   --fundo: #f6f7f9;
   --superficie: #ffffff;
   --superficie-2: #eef1f5;
   --texto: #1b2230;
   --texto-suave: #5b6576;
   --borda: #dde2ea;
+  /* Contorno de campo precisa de 3:1 contra o fundo; a borda comum é só divisória. */
+  --borda-campo: #7f8a9f;
   --primaria: #1f3a68;
   --primaria-hover: #2a4b84;
   --primaria-texto: #ffffff;
   --destaque: #e7eef9;
   --perigo: #b42318;
   --perigo-fundo: #fdecea;
-  --foco: #3b6fd1;
+  --perigo-texto: #ffffff;
+  --foco: #2f62c4;
   /* Séries de gráfico (validadas para daltonismo e contraste sobre a superfície). */
   --serie-1: #2a78d6;
   --serie-2: #eb6834;
@@ -23,18 +27,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --fundo: #0f141c;
     --superficie: #161c26;
     --superficie-2: #1d2532;
     --texto: #e6e9ef;
     --texto-suave: #9aa4b5;
     --borda: #2a3342;
+    --borda-campo: #6f7b91;
     --primaria: #6d9be8;
     --primaria-hover: #86acee;
     --primaria-texto: #0d1420;
     --destaque: #1e2a3d;
     --perigo: #f2867c;
     --perigo-fundo: #3a1d1b;
+    --perigo-texto: #1d0b09;
     --foco: #86acee;
     --serie-1: #3987e5;
     --serie-2: #d95926;
@@ -48,27 +55,112 @@
   --color-texto: var(--texto);
   --color-texto-suave: var(--texto-suave);
   --color-borda: var(--borda);
+  --color-borda-campo: var(--borda-campo);
   --color-primaria: var(--primaria);
   --color-primaria-hover: var(--primaria-hover);
   --color-primaria-texto: var(--primaria-texto);
   --color-destaque: var(--destaque);
   --color-perigo: var(--perigo);
   --color-perigo-fundo: var(--perigo-fundo);
+  --color-perigo-texto: var(--perigo-texto);
   --color-foco: var(--foco);
   --color-serie-1: var(--serie-1);
   --color-serie-2: var(--serie-2);
   --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-html,
-body,
-#root {
-  height: 100%;
+@theme {
+  /* Entrelinha menor conforme o texto cresce. */
+  --text-xs--line-height: 1.4;
+  --text-sm--line-height: 1.5;
+  --text-base--line-height: 1.55;
+  --text-lg--line-height: 1.25;
+  --text-xl--line-height: 1.25;
+  --text-2xl--line-height: 1.25;
+  --text-3xl--line-height: 1.2;
+
+  --shadow-suave: 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-flutuante: 0 8px 24px rgb(0 0 0 / 0.07);
+
+  --ease-entrada: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-saida: cubic-bezier(0.7, 0, 0.84, 0);
+
+  /* Largura máxima do conteúdo de página (o cabeçalho e a barra lateral vão de ponta a ponta). */
+  --container-pagina: 80rem;
+  --container-formulario: 40rem;
+  --container-leitura: 70ch;
 }
 
-body {
-  background: var(--fundo);
-  color: var(--texto);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
+/* Na camada base, para uma classe do Tailwind poder mudar a regra em um caso específico. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--fundo);
+    color: var(--texto);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Um anel de foco só, igual em todo lugar. */
+  :focus-visible {
+    outline: 2px solid var(--foco);
+    outline-offset: 2px;
+  }
+
+  /* Blocos que só recebem foco por programa, para situar o teclado; não são clicáveis. */
+  [tabindex="-1"]:focus {
+    outline: none;
+  }
+}
+
+/* Com mouse, a ação extra de uma linha só aparece ao apontar ou focar; no toque, sempre. */
+@media (hover: hover) {
+  .linha:not(:hover) .so-ao-apontar:not(:focus-within) {
+    opacity: 0;
+  }
+}
+
+@keyframes entra-da-direita {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes aparece {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes respira {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@theme {
+  --animate-gaveta: entra-da-direita 200ms var(--ease-entrada);
+  --animate-aparece: aparece 150ms var(--ease-entrada);
+  --animate-respira: respira 1.4s ease-in-out infinite;
+}
+
+/* Quem pede menos movimento recebe trocas instantâneas ou só de opacidade. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after,
+  ::backdrop {
+    animation: none !important;
+    transition-property: opacity !important;
+    transition-duration: 100ms !important;
+    scroll-behavior: auto !important;
+  }
 }

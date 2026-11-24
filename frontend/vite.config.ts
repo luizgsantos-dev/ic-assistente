@@ -12,6 +12,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // Em desenvolvimento a API roda em outra porta; o proxy evita CORS e mantém o cookie.
-    proxy: { "/api": "http://127.0.0.1:8000" },
+    // IC_API_URL troca o endereço quando a 8000 já está ocupada por outro projeto.
+    proxy: { "/api": process.env.IC_API_URL ?? "http://127.0.0.1:8000" },
   },
 });

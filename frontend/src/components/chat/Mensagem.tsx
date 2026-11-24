@@ -1,8 +1,9 @@
-import { AlertCircle, ChevronDown, FileText, ThumbsDown, ThumbsUp } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ChevronDown, FileText, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react";
+import { useId, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { Aviso, Botao, BotaoIcone } from "@/components/ui";
 import type { Citacao } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -19,16 +20,20 @@ export type MensagemTela = {
 
 type Props = {
   mensagem: MensagemTela;
-  aoAvaliar?: (mensagem: MensagemTela, valor: 1 | -1 | 0) => void;
+  aoAvaliar: (mensagem: MensagemTela, valor: 1 | -1 | 0) => void;
+  /** Só na última resposta, quando ela falhou. */
+  aoTentarDeNovo?: () => void;
 };
 
-export function Mensagem({ mensagem, aoAvaliar }: Props) {
+export function Mensagem({ mensagem, aoAvaliar, aoTentarDeNovo }: Props) {
   const [fontesAbertas, setFontesAbertas] = useState(false);
+  const idFontes = useId();
 
   if (mensagem.papel === "usuario") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primaria px-4 py-2.5 text-[15px] text-primaria-texto">
+        <div className="max-w-[85%] rounded-xl rounded-br-sm bg-primaria px-4 py-2 whitespace-pre-wrap text-primaria-texto [overflow-wrap:anywhere]">
+          <span className="sr-only">Pergunta: </span>
           {mensagem.conteudo}
         </div>
       </div>
@@ -37,20 +42,27 @@ export function Mensagem({ mensagem, aoAvaliar }: Props) {
 
   if (mensagem.estado === "erro") {
     return (
-      <div className="flex max-w-[85%] gap-2 rounded-2xl bg-perigo-fundo px-4 py-3 text-sm text-perigo" role="alert">
-        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-        <p>{mensagem.conteudo}</p>
-      </div>
+      <Aviso
+        acoes={
+          aoTentarDeNovo && (
+            <Botao variante="secundaria" onClick={aoTentarDeNovo}>
+              <RefreshCw className="size-4" aria-hidden />
+              Tentar de novo
+            </Botao>
+          )
+        }
+      >
+        {mensagem.conteudo}
+      </Aviso>
     );
   }
 
   if (mensagem.estado === "escrevendo" && !mensagem.conteudo) {
     return (
-      <p className="flex items-center gap-2 text-sm text-texto-suave" role="status">
+      <p className="flex items-center gap-2 text-sm text-texto-suave">
         <span className="flex gap-1" aria-hidden>
-          {[0, 150, 300].map((atraso) => (
-            <span key={atraso} className="size-1.5 animate-bounce rounded-full bg-texto-suave"
-              style={{ animationDelay: `${atraso}ms` }} />
+          {[0, 200, 400].map((atraso) => (
+            <span key={atraso} className="size-2 animate-respira rounded-full bg-texto-suave" style={{ animationDelay: `${atraso}ms` }} />
           ))}
         </span>
         Procurando nos documentos do IC…
@@ -60,100 +72,78 @@ export function Mensagem({ mensagem, aoAvaliar }: Props) {
 
   const grupos = agruparFontes(mensagem.citacoes ?? []);
   const pronta = mensagem.estado === "pronta";
+  const { avaliacao } = mensagem;
 
   return (
-    <div className="max-w-full">
+    <div>
       <div
         className={cn(
-          "prose prose-sm max-w-none text-[15px] text-texto dark:prose-invert",
-          "prose-p:my-2 prose-li:my-0.5 prose-headings:mb-2 prose-headings:mt-4",
-          "prose-a:text-primaria prose-strong:text-texto",
-          mensagem.estado === "escrevendo" && "after:ml-0.5 after:inline-block after:animate-pulse after:content-['▍']",
+          "prose max-w-leitura leading-[1.6] text-texto [overflow-wrap:anywhere] dark:prose-invert",
+          "prose-headings:mt-4 prose-headings:mb-2 prose-headings:text-lg prose-headings:leading-tight prose-headings:font-semibold",
+          "prose-p:my-2 prose-a:text-primaria prose-strong:font-semibold prose-strong:text-texto prose-li:my-1",
         )}
       >
         <Markdown remarkPlugins={[remarkGfm]}>{mensagem.conteudo}</Markdown>
       </div>
 
-      {pronta && (grupos.length > 0 || (mensagem.id && aoAvaliar)) && (
-        <div className="mt-2 flex items-center gap-1">
+      {pronta && (
+        <div className="mt-2 -ml-2 flex flex-wrap items-center">
           {grupos.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setFontesAbertas((a) => !a)}
+            <Botao
+              variante="fantasma"
+              className="px-2"
               aria-expanded={fontesAbertas}
-              className={botaoDiscreto}
+              aria-controls={idFontes}
+              onClick={() => setFontesAbertas((a) => !a)}
             >
-              <FileText className="size-3.5" aria-hidden />
-              Fontes ({grupos.length})
-              <ChevronDown className={cn("size-3.5 transition-transform", fontesAbertas && "rotate-180")} aria-hidden />
-            </button>
+              <FileText className="size-4" aria-hidden />
+              {fontesAbertas ? "Ocultar fontes" : `Ver fontes (${grupos.length})`}
+              <ChevronDown className={cn("size-4 transition-transform duration-150", fontesAbertas && "rotate-180")} aria-hidden />
+            </Botao>
           )}
-          {mensagem.id && aoAvaliar && (
+          {mensagem.id && (
             <div className="flex items-center" role="group" aria-label="Avaliar a resposta">
-              <BotaoAvaliacao
-                ativo={mensagem.avaliacao === 1}
-                rotulo="Resposta útil"
-                aoClicar={() => aoAvaliar(mensagem, mensagem.avaliacao === 1 ? 0 : 1)}
+              <BotaoIcone
+                rotulo="Marcar como útil"
+                aria-pressed={avaliacao === 1}
+                className={cn(avaliacao === 1 && "text-primaria [&_svg]:fill-destaque")}
+                onClick={() => aoAvaliar(mensagem, avaliacao === 1 ? 0 : 1)}
               >
-                <ThumbsUp className="size-3.5" />
-              </BotaoAvaliacao>
-              <BotaoAvaliacao
-                ativo={mensagem.avaliacao === -1}
-                rotulo="Resposta errada ou incompleta"
-                aoClicar={() => aoAvaliar(mensagem, mensagem.avaliacao === -1 ? 0 : -1)}
+                <ThumbsUp />
+              </BotaoIcone>
+              <BotaoIcone
+                rotulo="Marcar como errada"
+                aria-pressed={avaliacao === -1}
+                className={cn(avaliacao === -1 && "text-primaria [&_svg]:fill-destaque")}
+                onClick={() => aoAvaliar(mensagem, avaliacao === -1 ? 0 : -1)}
               >
-                <ThumbsDown className="size-3.5" />
-              </BotaoAvaliacao>
+                <ThumbsDown />
+              </BotaoIcone>
+              {/* O estado também aparece escrito, não só pela cor do ícone. */}
+              {avaliacao ? (
+                <span className="text-sm text-texto-suave">
+                  {avaliacao === 1 ? "Marcada como útil" : "Marcada como errada"}
+                </span>
+              ) : null}
             </div>
           )}
         </div>
       )}
 
-      {pronta && fontesAbertas && (
-        <ul className="mt-1.5 space-y-2 border-l-2 border-borda pl-3">
-          {grupos.map((g) => (
-            <li key={`${g.titulo}${g.paginas}`} className="text-xs">
-              <p className="font-medium text-texto">
-                {g.titulo}
-                {g.paginas && <span className="font-normal text-texto-suave"> · {g.paginas}</span>}
-              </p>
-              {g.trechos.map((t, i) => (
-                <p key={i} className="mt-0.5 line-clamp-3 italic text-texto-suave">“{t}”</p>
-              ))}
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul id={idFontes} hidden={!pronta || !fontesAbertas} className="mt-2 space-y-4 rounded-lg border border-borda bg-superficie p-4">
+        {grupos.map((g) => (
+          <li key={`${g.titulo}${g.paginas}`} className="max-w-leitura text-sm">
+            <p className="font-medium">
+              {g.titulo}
+              {g.paginas && <span className="font-normal text-texto-suave"> · {g.paginas}</span>}
+            </p>
+            {g.trechos.map((t, i) => (
+              <p key={i} className="mt-1 line-clamp-4 text-texto-suave">“{t}”</p>
+            ))}
+          </li>
+        ))}
+      </ul>
     </div>
-  );
-}
-
-const botaoDiscreto =
-  "inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium " +
-  "text-texto-suave hover:bg-superficie-2 hover:text-texto";
-
-function BotaoAvaliacao({
-  ativo,
-  rotulo,
-  aoClicar,
-  children,
-}: {
-  ativo: boolean;
-  rotulo: string;
-  aoClicar: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={aoClicar}
-      aria-pressed={ativo}
-      aria-label={rotulo}
-      title={rotulo}
-      className={cn(botaoDiscreto, "px-2", ativo && "bg-destaque text-texto")}
-    >
-      {children}
-    </button>
   );
 }
 
